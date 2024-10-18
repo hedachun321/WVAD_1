@@ -58,66 +58,48 @@ def hard_snippets_mining(actionness, fertures_, args):
     return hard_act_mu, hard_bkg_mu
 
 
-# 欧氏距离
 def Euclidean_distance_single(x, y):
-    distance = []
-    for i in range(x.shape[1]):
-        for j in range(y.shape[1]):
-            dist = torch.cdist(x[:, i, :], y[:, j, :])
-            distance.append(dist)
+    # 直接计算两个张量之间的欧氏距离
+    dist = torch.cdist(x, y)
 
-    distance = torch.stack(distance, dim=-1)
-    return distance.mean(-1)
+    return torch.mean(dist)
 
 
-# KL 散度
 def KL_divergence_single(x, y):
-    distance = []
-    for i in range(x.shape[1]):
-        for j in range(y.shape[1]):
-            x_ij = x[:, i, :] + 1e-5
-            y_ij = y[:, j, :] + 1e-5
+    # 添加小常数避免除零
+    x = x + 1e-5
+    y = y + 1e-5
 
-            term1 = 0.5 * torch.einsum('bd,bd,bd->b', [(y_ij - x_ij), 1 / y_ij, (y_ij - x_ij)])
-            term2 = 0.5 * (torch.log(y_ij).sum(-1) - torch.log(x_ij).sum(-1))
-            term3 = 0.5 * ((x_ij / y_ij).sum(-1))
+    # 计算 KL 散度的不同项
+    term1 = 0.5 * torch.einsum('bd,bd,bd->b', [(y - x), 1 / y, (y - x)])
+    term2 = 0.5 * (torch.log(y).sum(-1) - torch.log(x).sum(-1))
+    term3 = 0.5 * ((x / y).sum(-1))
 
-            dist = term1 + term2 + term3 - 0.5 * x_ij.shape[1]
-            distance.append(1 / (dist + 1))
+    dist = term1 + term2 + term3 - 0.5 * x.shape[1]
 
-    distance = torch.stack(distance, dim=-1)
-    return distance.mean(-1)
+    return torch.mean(1 / (dist + 1))
 
 
-# Bhattacharyya 距离
 def Bhattacharyya_distance_single(x, y):
-    distance = []
-    for i in range(x.shape[1]):
-        for j in range(y.shape[1]):
-            x_ij = x[:, i, :] + 1e-5
-            y_ij = y[:, j, :] + 1e-5
+    # 添加小常数避免除零
+    x = x + 1e-5
+    y = y + 1e-5
 
-            term1 = 0.125 * torch.einsum('bd,bd,bd->b', [(x_ij - y_ij), 2 / (x_ij + y_ij), (x_ij - y_ij)])
-            term2 = 0.5 * (torch.log((x_ij + y_ij) / 2).sum(-1) - (torch.log(x_ij).sum(-1) + torch.log(y_ij).sum(-1)))
+    # 计算 Bhattacharyya 距离的不同项
+    term1 = 0.125 * torch.einsum('bd,bd,bd->b', [(x - y), 2 / (x + y), (x - y)])
+    term2 = 0.5 * (torch.log((x + y) / 2).sum(-1) - (torch.log(x).sum(-1) + torch.log(y).sum(-1)))
 
-            dist = term1 + term2
-            distance.append(1 / (dist + 1))
+    dist = term1 + term2
 
-    distance = torch.stack(distance, dim=-1)
-    return distance.mean(-1)
+    return torch.mean(1 / (dist + 1))
 
 
-# 马氏距离
 def Mahalanobis_distance_single(x, y):
-    distance = []
-    for i in range(x.shape[1]):
-        for j in range(y.shape[1]):
-            cov_inv = 2 / (x[:, i, :] + y[:, j, :] + 1e-5)
-            dist = torch.einsum('bd,bd,bd->b', [(x[:, i, :] - y[:, j, :]), cov_inv, (x[:, i, :] - y[:, j, :])])
-            distance.append(1 / (dist + 1))
+    # 假设 x 和 y 是直接输入的单个张量，而不是成对的均值和协方差
+    cov_inv = 1 / (x + y + 1e-5)  # 可以根据需要调整 1e-5 以防止除零
+    dist = torch.einsum('bd,bd,bd->b', [(x - y), cov_inv, (x - y)])
 
-    distance = torch.stack(distance, dim=-1)
-    return distance.mean(-1)
+    return torch.mean(1 / (dist + 1))
 
 
 def Intra_ProbabilsticContrastive(hard_query, easy_pos, easy_neg, args):
@@ -148,7 +130,7 @@ def Intra_ProbabilsticContrastive(hard_query, easy_pos, easy_neg, args):
         return loss.mean()
 
 
-def CLASM3(logits, feature_, device, lengths,  args):
+def CLASM3(logits, feature_, device, args):
     # 超参
 
     easy_act, easy_bkg = easy_snippets_mining(logits, feature_, args)
@@ -199,9 +181,6 @@ def CLAS4(logits, labels, lengths, device, args):
     total_loss = normal_vs_abnormal_loss + abnormal_vs_topk_loss
 
     return total_loss
-
-
-
 
 def CLASM(logits, labels, lengths, device):
     instance_logits = torch.zeros(0).to(device)
@@ -268,7 +247,7 @@ def train(model, normal_loader, anomaly_loader, testloader, args, label_map, dev
 
             text_features, logits1, logits2, features_ = model(visual_features, None, prompt_text, feat_lengths)
             #loss1
-            loss1 = CLAS2(logits1, text_labels, feat_lengths, device) 
+            loss1 = CLAS2(logits1, text_labels, feat_lengths, device)
             loss_total1 += loss1.item()
             #loss2
             loss2 = CLASM(logits2, text_labels, feat_lengths, device)
@@ -281,12 +260,10 @@ def train(model, normal_loader, anomaly_loader, testloader, args, label_map, dev
                 loss3 += torch.abs(text_feature_normal @ text_feature_abr)
             loss3 = loss3 / 13 * 1e-1
 
-            # loss4 = CLASM3(logits1[32:], features_[32:], device, feat_lengths, args)
-
+            # loss4 = CLASM3(logits1[32:], features_[32:], device, args)
             loss5 = CLAS4(logits1, text_labels, feat_lengths, device, args)
 
-            # loss = loss1 + loss2 + loss3 + loss4 + loss5
-
+            #loss = loss1 + loss2 + loss3
             loss = loss1 + loss2 + loss3 + loss5
 
             optimizer.zero_grad()
@@ -299,16 +276,18 @@ def train(model, normal_loader, anomaly_loader, testloader, args, label_map, dev
                 AP = AUC
 
                 if AP > ap_best:
-                    ap_best = AP 
+                    ap_best = AP
                     checkpoint = {
                         'epoch': e,
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         'ap': ap_best}
                     torch.save(checkpoint, args.checkpoint_path)
-                
+
+                print("Current best AUC1: ", ap_best)
+
         scheduler.step()
-        
+
         torch.save(model.state_dict(), '../model/model_cur.pth')
         checkpoint = torch.load(args.checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
