@@ -42,3 +42,5 @@ parser.add_argument('--alpha2', default=0.4, type=float, help="Weight for backgr
 
 parser.add_argument('--alpha5', default=0.1, type=float, help="Weight for action contrastive loss")
 parser.add_argument('--alpha6', default=0.1, type=float, help="Weight for background contrastive loss")
+
+# 测试
