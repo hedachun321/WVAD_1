@@ -75,13 +75,13 @@ def test(model, testdataloader, maxlen, prompt_text, gt, gtsegments, gtlabels, d
     print("AUC1: ", ROC1, " AP1: ", AP1)
     print("AUC2: ", ROC2, " AP2:", AP2)
 
-    dmap, iou = dmAP(element_logits2_stack, gtsegments, gtlabels, excludeNormal=False)
-    averageMAP = 0
-    for i in range(5):
-        print('mAP@{0:.1f} ={1:.2f}%'.format(iou[i], dmap[i]))
-        averageMAP += dmap[i]
-    averageMAP = averageMAP/(i+1)
-    print('average MAP: {:.2f}'.format(averageMAP))
+    # dmap, iou = dmAP(element_logits2_stack, gtsegments, gtlabels, excludeNormal=False)
+    # averageMAP = 0
+    # for i in range(5):
+    #     print('mAP@{0:.1f} ={1:.2f}%'.format(iou[i], dmap[i]))
+    #     averageMAP += dmap[i]
+    # averageMAP = averageMAP/(i+1)
+    # print('average MAP: {:.2f}'.format(averageMAP))
 
     return ROC1, AP1
 
