@@ -304,28 +304,11 @@ def setup_seed(seed):
 
 
 if __name__ == '__main__':
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     args = ucf_option.parser.parse_args()
-    setup_seed(args.seed)
-
-    label_map = dict({'Normal': 'normal', 'Abuse': 'abuse', 'Arrest': 'arrest', 'Arson': 'arson',
-                      'Assault': 'assault', 'Burglary': 'burglary', 'Explosion': 'explosion',
-                      'Fighting': 'fighting', 'RoadAccidents': 'roadAccidents', 'Robbery': 'robbery',
-                      'Shooting': 'shooting', 'Shoplifting': 'shoplifting', 'Stealing': 'stealing',
-                      'Vandalism': 'vandalism'})
-
-    normal_dataset = UCFDataset(args.visual_length, args.train_list, False, label_map, True)
-    normal_loader = DataLoader(normal_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
-    anomaly_dataset = UCFDataset(args.visual_length, args.train_list, False, label_map, False)
-    anomaly_loader = DataLoader(anomaly_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
-
-    test_dataset = UCFDataset(args.visual_length, args.test_list, True, label_map)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
     # 网格搜索超参数
     param_grid = {
-        'alpha5': [0.1, 0.3, 0.5, 0.7, 0.9],
-        'alpha6': [0.1, 0.3, 0.5, 0.7, 0.9],
+        'alpha1': [0.1, 0.3, 0.5, 0.7, 0.9],
+        'alpha2': [0.1, 0.3, 0.5, 0.7, 0.9],
     }
 
     import itertools
@@ -341,8 +324,26 @@ if __name__ == '__main__':
         params = dict(zip(keys, combination))
 
         # 更新 args 中的参数
-        args.alpha5 = params['alpha5']
-        args.alpha6 = params['alpha6']
+        args.alpha1 = params['alpha1']
+        args.alpha2 = params['alpha2']
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        setup_seed(args.seed)
+
+        label_map = dict({'Normal': 'normal', 'Abuse': 'abuse', 'Arrest': 'arrest', 'Arson': 'arson',
+                          'Assault': 'assault', 'Burglary': 'burglary', 'Explosion': 'explosion',
+                          'Fighting': 'fighting', 'RoadAccidents': 'roadAccidents', 'Robbery': 'robbery',
+                          'Shooting': 'shooting', 'Shoplifting': 'shoplifting', 'Stealing': 'stealing',
+                          'Vandalism': 'vandalism'})
+
+        normal_dataset = UCFDataset(args.visual_length, args.train_list, False, label_map, True)
+        normal_loader = DataLoader(normal_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+        anomaly_dataset = UCFDataset(args.visual_length, args.train_list, False, label_map, False)
+        anomaly_loader = DataLoader(anomaly_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+
+        test_dataset = UCFDataset(args.visual_length, args.test_list, True, label_map)
+        test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
         # 创建模型
         model = CLIPVAD(args.classes_num, args.embed_dim, args.visual_length, args.visual_width,
@@ -351,10 +352,11 @@ if __name__ == '__main__':
 
         # 训练模型并获取评分
         ap_best = train(model, normal_loader, anomaly_loader, test_loader, args, label_map, device)
-
         if ap_best > best_score:
             best_score = ap_best
             best_params = params
+        print("Current Score:", best_score)
+        print("Current Params:", params)
 
     print("Best Score:", best_score)
     print("Best Params:", best_params)
